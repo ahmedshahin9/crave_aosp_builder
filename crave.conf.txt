@@ -1,0 +1,10 @@
+{
+  "username": "ahmedshahinx0x@gmail.com",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjE5OSwidGVhbUlkIjoxNCwiaXNBcGlLZXkiOnRydWUsImlhdCI6MTcxMDk1NjMxMn0.oD_UF_eKBXYLuR9tB6NoW5MFrIsqwnjnj_VE49uaoU4",
+    "User-Agent": "Crave"
+  },
+  "projects": [],
+  "server": "https://foss.crave.io/api"
+}
