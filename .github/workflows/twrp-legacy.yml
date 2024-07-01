@@ -31,7 +31,7 @@ on:
       LOCAL_MANIFEST_BRANCH:
         description: "Personal local manifest's branch:"
         required: false
-        default: 'lineage-oxygen'
+        default: 'twrp-oxygen-12.1'
       DEVICE_NAME:
         description: "Device's codename:"
         required: true
@@ -39,11 +39,11 @@ on:
       PRODUCT_NAME:
         description: "Product to build:"
         required: true
-        default: "lineage_oxygen"
+        default: "twrp_oxygen"
       BUILD_COMMAND:
         description: 'Command to be used for compiling:'
         required: true
-        default: 'make recoveryimage'
+        default: 'make recoveryimage -j\$(nproc --all)'
       BUILD_TYPE:
         description: 'Type of build:'
         required: true
@@ -67,6 +67,28 @@ jobs:
     name: Prepare for Building
     runs-on: ubuntu-latest
     steps:
+    - name: Display Run Parameters # Credit to azwhikaru for this part
+      run: |
+        echo "::group::User Environment Variables"
+        echo "Base Project: ${{ github.event.inputs.BASE_PROJECT }}"
+        echo "Extra Repo Init: ${{ github.event.inputs.BUILD_DIFFERENT_ROM }}"
+        echo "Removals: ${{ github.event.inputs.REMOVALS }}"
+        echo "Local Manifest: ${{ github.event.inputs.LOCAL_MANIFEST }}"
+        echo "Local Manifest Branch: ${{ github.event.inputs.LOCAL_MANIFEST_BRANCH }}"
+        echo "Device Name: ${{ github.event.inputs.DEVICE_NAME }}"
+        echo "Lunch Target: ${{ github.event.inputs.PRODUCT_NAME }} ${{ github.event.inputs.BUILD_TYPE }}"
+        echo "Build Command: ${{ github.event.inputs.BUILD_COMMAND }}"
+        echo "Clean Build: ${{ github.event.inputs.CLEAN_BUILD }}"
+        echo "::endgroup::"
+
+        echo "Displaying Local Manifests"
+        if [[ -z "${{ secrets.DISPLAY_FALSE }}" ]]; then
+          git clone ${{ github.event.inputs.LOCAL_MANIFEST }} --depth 1 -b ${{ github.event.inputs.LOCAL_MANIFEST_BRANCH }} local_manifests
+          cat local_manifests/*.xml
+        else
+          echo "Displaying is disabled through secrets."
+        fi
+
     - name: Set Project variables
       id: proj-variables
       run: |
@@ -162,7 +184,7 @@ jobs:
       # Change this to self-hosted after setting up devspace as github actions runner
     runs-on: ubuntu-latest
     concurrency:
-      group: ${{ github.actor }}
+      group: ${{ github.actor }}-small
     steps:
       # Accept Project Variables
     - name: Set Repo Project
@@ -240,8 +262,18 @@ jobs:
       # Send Build 'start' notification
     - name: Telegram Notification
       continue-on-error: true
-      uses: xinthink/action-telegram@v1.1
-      with:
+      run: |
+        send_telegram_message() {
+          local message="$1"
+          curl -s -X POST \
+          https://api.telegram.org/bot$botToken/sendMessage \
+          -d chat_id=$chatId \
+          -d text="$message" \
+          -d parse_mode="Markdown"
+        }
+
+        send_telegram_message "Crave ProjectID: $PROJECTID %0ABuild for ${{ github.event.inputs.DEVICE_NAME }} has been queued %0ACheck Progress at: %0Ahttps://github.com/$(echo "${{ github.repository }}" | sed 's@_@\\_@g')/actions/runs/${{ github.run_id }}"
+      env:
         chatId: ${{ secrets.TELEGRAM_TO }}
         botToken: ${{ secrets.TELEGRAM_TOKEN }}
         jobStatus: "Build Started"
@@ -262,7 +294,7 @@ jobs:
           cp crave.conf $PROJECTFOLDER
         fi
         if [[ -z "${{ secrets.CUSTOM_YAML }}" ]]; then
-          cp yamls/crave.yaml.twrp.legacy $PROJECTFOLDER/.repo/manifests/crave.yaml
+          cp configs/crave/crave.yaml.twrp.legacy $PROJECTFOLDER/.repo/manifests/crave.yaml
           echo "No Custom Configuration Found, Using Template!"
         else
           touch $PROJECTFOLDER/.repo/manifests/crave.yaml || true
@@ -299,12 +331,12 @@ jobs:
            export CLEAN="clean"
         fi
 
-        crave run --no-patch --${CLEAN} "rm -rf .repo/local_manifests/ ${{ github.event.inputs.REMOVALS }} && \
+        crave ${{ secrets.CRAVE_FLAGS }} run --no-patch --${CLEAN} "rm -rf .repo/local_manifests/ ${{ github.event.inputs.REMOVALS }} && \
         # Clone local_manifests repository
         $BUILD_DIFFERENT_ROM ; \
         git clone ${{ github.event.inputs.LOCAL_MANIFEST }} --depth 1 -b ${{ github.event.inputs.LOCAL_MANIFEST_BRANCH }} .repo/local_manifests && \
 
-        if [ ! $? == 0 ]; then \
+        if [ ! \$? == 0 ]; then \
           curl -o .repo/local_manifests ${{ github.event.inputs.LOCAL_MANIFEST }}; \
           echo "Git clone failed, downloading through curl instead..."; \
         fi \
@@ -329,8 +361,19 @@ jobs:
     - name: Telegram Notification
       if:  ${{ success()  || cancelled() || failure() }}
       continue-on-error: true
-      uses: xinthink/action-telegram@v1.1
-      with:
+      run: |
+        send_telegram_message() {
+          local message="$1"
+          curl -s -X POST \
+          https://api.telegram.org/bot$botToken/sendMessage \
+          -d chat_id=$chatId \
+          -d text="$message" \
+          -d parse_mode="Markdown"
+        }
+
+        send_telegram_message "Crave ProjectID: $PROJECTID %0ABuild for ${{ github.event.inputs.DEVICE_NAME }} has status: $jobStatus %0ACheck Progress at: %0Ahttps://github.com/$(echo "${{ github.repository }}" | sed 's@_@\\_@g')/actions/runs/${{ github.run_id }}"
+        # Todo: error.log link
+      env:
         chatId: ${{ secrets.TELEGRAM_TO }}
         botToken: ${{ secrets.TELEGRAM_TOKEN }}
         jobStatus: ${{ job.status }}

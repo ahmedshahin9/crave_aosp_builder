@@ -10,12 +10,17 @@
 [stars-shield]: https://img.shields.io/github/stars/sounddrill31/crave_aosp_builder.svg?style=for-the-badge
 [stars-url]: https://github.com/sounddrill31/crave_aosp_builder/stargazers
 
+## Wiki
+While using this repo, please take a look at [the wiki](https://opendroid.pugzarecute.com/wiki) as well!
+
 ## Prerequisites 
 foss.crave.io account
 
+This workflow assumes you know basics of android building and github actions. Please read the Readme thoroughly before asking questions.
+
 ## Setup Instructions
 - Download crave.conf from API Keys of foss.crave.io dashboard
-- Fork this repo
+- Fork this repo(please avoid importing it via the import menu or manually copying the workflow file. This hurts fork stats and makes it harder for you to update the repo to the latest version)
 - Go to (repo) Settings -> Security -> Secrets and Variables -> Actions
 - Copy your username and authentication token from crave.conf
 ![Repository Secrets](assets/cravetoken.png)
@@ -27,6 +32,11 @@ foss.crave.io account
 
 - Go to Settings -> Code and Automation -> Actions -> General
 - Set workflow Permissions to "Read and Write Permissions" and save.
+
+If this is greyed out and you're building from a Github Organization, 
+
+go to Organization settings -> Code, planning, and automation -> Actions -> General -> Workflow permissions, set it to "Read and Write Permissions" and save
+
 - Now you are ready to build! Go to "Crave Builder" workflow and start building
 ## Selfhosted Runners:
 These runners sit in crave devspace CLI or your personal server and run the workflow on there. Use this if you need to bypass the 6 hours timeout limit.
@@ -85,10 +95,14 @@ If this exists, these files will be uploaded too. Remember to use relative path 
 Bot token for telegram notifications
 ### TELEGRAM_TO (Optional)
 Chat id for telegram notifications
+### CRAVE_FLAGS (Optional)
+Extra flags for crave binary
 ### TG_UPLOAD_LIMIT (Optional)
 Custom Upload limit for telegram-upload. Default is 2147483648
 ### GH_UPLOAD_LIMIT (Optional)
 Custom Upload limit for github releases. Default is 2147483648
+### DISPLAY_FALSE (Optional)
+This workflow displays your local manifests by default. To disable this, create this secret with any data
 
 ## Inputs Explanation
 ### Base Project
@@ -105,8 +119,8 @@ Custom Upload limit for github releases. Default is 2147483648
 ### Local Manifest
     - Here you enter the git repo and branch for your local manifests, containing device specific repositories. These will be cloned to .repo/local_manifests
 ### Device Details
-    - Enter the device codename you want to build for inside DEVICE_NAME
-    - Enter the makefile name(without the .mk) inside MAKEFILE_NAME
+    - Enter the device codename you want to build for inside DEVICE_NAME, like "oxygen".
+    - Enter the device codename inside PRODUCT_NAME, to be inserted into the breakfast command. If you enter makefile name(without the .mk, like "lineage_oxygen"), it will fallback to using the lunch command. 
 ### Build Command
     - eg. m updatepackage, mka bacon, make recoveryimage
 ### Build Type
@@ -130,3 +144,71 @@ Custom Upload limit for github releases. Default is 2147483648
   - [My Manifest tester](https://github.com/sounddrill31/Manifest_Tester) (credits to [AmogOS](https://github.com/AmogOS-Rom) project for original logic)
   - [Other contributors](https://github.com/sounddrill31/crave_aosp_builder/graphs/contributors)
   - [The crave team](https://github.com/accupara) for the build servers and helping us out when we get stuck
+
+## FAQs:
+
+### Signup
+
+Q1. What is this Crave.io? How do I get an account?
+
+A. Crave.io is a build accelerator capable of cutting down build time by quite a bit. They are providing free build servers, however: self signup is disabled. 
+
+Please contact either `uvatbc`(`yuvraaj` on telegram) or me on discord/telegram.
+
+Remember to share the following:
+- Name
+- Email
+- Git profile(preferably with your device sources or stuff you're proud of)    
+
+
+### Chat Help
+Q2. Hey, I get an error with this repository! Whom do i ask?
+
+A. Please feel free to contact me through the [crave.io discord](https://discord.crave.io) or [ROM Builders telegram](https://t.me/ROM_builders). My username is `sounddrill`
+
+
+### Unsupported ROMs
+Q3. This doesn't support XXnewrom2024XX! How do I build it?
+
+A. [Read this](#repo-init-command)
+
+Here, we enter our repo init command for a non-supported ROM. If we are building something that's supported by crave, we can leave the default as is. 
+
+Doing this is not recommended and is known to be troublesome. However, it doesn't break any crave rules yet. 
+
+### Build Signing
+Q4. How do I sign my builds?
+
+A. Build signing can be done using Backblaze B2 Buckets to hold the private keys. 
+
+Follow [this](https://opendroid.pugzarecute.com/wiki/Crave_Signing) guide to generate, encrypt and upload your keys to Backblaze.
+
+Create a actions secret called CUSTOM_YAML with the correct credentials as your environment variables. If this secret is set, the workflow will use this for crave.yaml, instead of the templates found in config/crave folder of this repository. 
+
+```
+LOS 21:
+  ignoreClientHostname: true
+  env:
+    BUCKET_NAME: your_bucket_name
+    KEY_ENCRYPTION_PASSWORD: your_key_encryption_password
+    BKEY_ID: your_bkey_id
+    BAPP_KEY: your_bapp_key
+```
+
+Replace "LOS 21" with your base project's name. Remember to use the correct name, get it from `crave clone list`.
+
+Also remember to replace the placeholder credentials with actual values.
+
+It is also recommended to set ignoreClientHostname to preserve workflow persistence. Read more about it [here](https://opendroid.pugzarecute.com/wiki/Crave_Devspace#workspace-persistence).
+
+Steps:
+- Go to (repo) Settings -> Security -> Secrets and Variables -> Actions
+- Set repository secret called CUSTOM_YAML
+- Enter the contents of your crave.yaml from above
+
+While building: 
+- Replace 'mka bacon' in the build command section of the workflow dispatch to:
+
+```
+mka target-files-package otatools; /opt/crave/crave_sign.sh
+```
